@@ -16,6 +16,12 @@ export const AUTHORIZED_PROFESSORS = [
   { name: "최윤식", email: "ysfuture@gmail.com" }
 ];
 
+export const AUTHORIZED_ADMINS = [
+  { name: "시스템 관리자", email: "admin@oikos.ac.kr" },
+  { name: "학과장", email: "head@oikos.ac.kr" },
+  { name: "최영준", email: "ezr710@gmail.com" }
+];
+
 export const COURSES: Course[] = [
   {
     id: "gen-ai-101",
@@ -66,14 +72,8 @@ export const DEFENSE_SCHEDULES: DefenseSchedule[] = [
   { date: "3월 9일(월)", time: "저녁 8시", students: ["이경숙", "김은하", "이경림", "조재윤"] }
 ];
 
-// 가상 학생 데이터와 그들이 수강 신청한 과목들
-export const MOCK_STUDENT_REGISTRY = [
-  { name: "이몽룡", email: "lee@oikos.ac.kr", registeredCourseIds: ["gen-ai-101", "media-creation"] },
-  { name: "성춘향", email: "sung@oikos.ac.kr", registeredCourseIds: ["gen-ai-101", "creative-writing"] },
-  { name: "심청이", email: "shim@oikos.ac.kr", registeredCourseIds: ["business-ai", "ethics-ai"] },
-  { name: "장화", email: "jang@oikos.ac.kr", registeredCourseIds: ["gen-ai-101", "ethics-ai"] },
-  { name: "홍련", email: "hong@oikos.ac.kr", registeredCourseIds: ["media-creation", "creative-writing"] }
-];
+// 가짜 데이터(성춘향 등)를 완전히 비워 실제 테스트 데이터만 쌓이도록 함
+export const MOCK_STUDENT_REGISTRY: any[] = [];
 
 export const ANNOUNCEMENTS: Announcement[] = [
   {
