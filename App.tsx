@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { User, Role, Course, Resource } from './types';
+import React, { useState, useEffect } from 'react';
+import { User, Role, Resource } from './types';
 import { COURSES, ANNOUNCEMENTS, AUTHORIZED_PROFESSORS, AUTHORIZED_ADMINS, RESOURCES } from './constants';
 import { Navbar } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
@@ -8,14 +8,13 @@ import { CourseDetail } from './components/CourseDetail';
 import { CourseRegistration } from './components/CourseRegistration';
 import { storageService } from './services/storageService';
 
-const DB_VERSION = "1.6.0 (Cloud Connected)"; 
+const DB_VERSION = "1.1.0 (Local Persistence)"; 
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeView, setActiveView] = useState<string>('home');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
   // Database States
@@ -28,17 +27,17 @@ const App: React.FC = () => {
   const [role, setRole] = useState<Role>(Role.STUDENT);
   const [rememberEmail, setRememberEmail] = useState(false);
 
-  // Load Database ASYNC from Service
+  // Load Database synchronously from Storage Service (LocalStorage)
   useEffect(() => {
-    const initData = async () => {
+    const initData = () => {
       setIsLoading(true);
       try {
-        const students = await storageService.load<any[]>('global_students', []);
-        const resources = await storageService.load<Resource[]>('global_resources', RESOURCES);
+        // 우선 로컬 저장소에서 데이터를 확인합니다.
+        const students = storageService.load<any[]>('global_students', []);
+        const resources = storageService.load<Resource[]>('global_resources', RESOURCES);
         
-        // Use local storage for user/email for faster boot
         const savedEmail = localStorage.getItem('OIKOS_LMS_REMEMBERED_EMAIL');
-        const savedUserStr = localStorage.getItem('OIKOS_LMS_V1_current_user');
+        const savedUserStr = localStorage.getItem('OIKOS_LMS_V1.1_current_user');
 
         setGlobalStudents(students);
         setGlobalResources(resources);
@@ -60,18 +59,10 @@ const App: React.FC = () => {
     initData();
   }, []);
 
-  // Sync Global Data with Debounce to prevent too many Firebase writes
+  // Sync Global Data with LocalStorage whenever state changes
   useEffect(() => {
-    if (isLoading) return; // Don't sync during initial load
-    
-    const sync = async () => {
-      setSyncing(true);
-      await storageService.save('global_students', globalStudents);
-      setTimeout(() => setSyncing(false), 1000);
-    };
-
-    const timer = setTimeout(sync, 1500);
-    return () => clearTimeout(timer);
+    if (isLoading) return;
+    storageService.save('global_students', globalStudents);
   }, [globalStudents, isLoading]);
 
   useEffect(() => {
@@ -81,9 +72,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem('OIKOS_LMS_V1_current_user', JSON.stringify(user));
+      localStorage.setItem('OIKOS_LMS_V1.1_current_user', JSON.stringify(user));
     } else {
-      localStorage.removeItem('OIKOS_LMS_V1_current_user');
+      localStorage.removeItem('OIKOS_LMS_V1.1_current_user');
     }
   }, [user]);
 
@@ -107,6 +98,7 @@ const App: React.FC = () => {
       finalRegisteredIds = COURSES.map(c => c.id);
     }
     else {
+      // 로컬 명단에서 먼저 찾아봅니다.
       const existingStudent = globalStudents.find(s => s.email.toLowerCase() === normalizedEmail);
       if (existingStudent) {
         finalName = existingStudent.name;
@@ -181,7 +173,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `OIKOS_LMS_CLOUD_BACKUP.json`;
+    a.download = `OIKOS_LMS_BACKUP.json`;
     a.click();
   };
 
@@ -189,7 +181,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 flex-col gap-4">
         <div className="w-12 h-12 border-4 border-blue-100 border-t-[#00479d] rounded-full animate-spin"></div>
-        <p className="text-[#00479d] font-black text-sm animate-pulse">CONNECTING TO CLOUD DATABASE...</p>
+        <p className="text-[#00479d] font-black text-sm animate-pulse">LOADING DATABASE...</p>
       </div>
     );
   }
@@ -248,24 +240,14 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc]">
-      {/* Sync Status Indicator */}
-      <div className={`h-1 transition-all duration-700 ${syncing ? 'bg-blue-400 w-full opacity-100' : 'bg-transparent w-0 opacity-0'}`} />
-      
       <Navbar user={user} onLogout={handleLogout} activeView={activeView} setActiveView={setActiveView} />
       
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-end mb-4 h-4">
-           {syncing ? (
-             <span className="text-[9px] font-black text-blue-400 flex items-center gap-1">
-               <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-ping"></span>
-               SYNCING TO FIREBASE...
-             </span>
-           ) : (
-             <span className="text-[9px] font-black text-emerald-400 flex items-center gap-1">
-               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-               CLOUD CONNECTED (V{DB_VERSION})
-             </span>
-           )}
+           <span className="text-[9px] font-black text-emerald-400 flex items-center gap-1">
+             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+             PERSISTENCE ACTIVE (V{DB_VERSION})
+           </span>
         </div>
 
         {activeView === 'home' && (
@@ -398,7 +380,7 @@ const App: React.FC = () => {
              <img src="https://www.oikos.ac.kr/images/common/logo.png" alt="Oikos Logo" className="h-8" />
           </div>
           <p className="text-gray-400 text-sm font-black tracking-widest uppercase">OIKOS University AI Convergence LMS</p>
-          <p className="text-gray-300 text-[10px] mt-4 font-bold tracking-[0.3em] uppercase">Persistent Cloud Sync V{DB_VERSION}</p>
+          <p className="text-gray-300 text-[10px] mt-4 font-bold tracking-[0.3em] uppercase">Persistent Storage V{DB_VERSION}</p>
           <div className="mt-8 flex justify-center gap-6">
              <span className="w-2 h-2 bg-blue-100 rounded-full"></span>
              <span className="w-2 h-2 bg-blue-100 rounded-full"></span>

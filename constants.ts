@@ -57,8 +57,8 @@ export const COURSES: Course[] = [
   },
   {
     id: "ethics-ai",
-    title: "AI시대 삶과 기독교 윤리",
-    titleEn: "Practical Theology in the Age of AI",
+    title: "AI 시대의 삶과 기독교윤리",
+    titleEn: "Christian Ethics for Life in the Age of AI",
     instructor: "최영준 교수",
     description: "AI 시대의 사회와 문화 속에서 기독교 신앙을 실천하는 방법을 통합적으로 탐구한다.",
     dates: ["4월 6일", "4월 13일", "4월 20일"],
@@ -72,7 +72,6 @@ export const DEFENSE_SCHEDULES: DefenseSchedule[] = [
   { date: "3월 9일(월)", time: "저녁 8시", students: ["이경숙", "김은하", "이경림", "조재윤"] }
 ];
 
-// 가짜 데이터(성춘향 등)를 완전히 비워 실제 테스트 데이터만 쌓이도록 함
 export const MOCK_STUDENT_REGISTRY: any[] = [];
 
 export const ANNOUNCEMENTS: Announcement[] = [
