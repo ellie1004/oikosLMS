@@ -10,6 +10,19 @@ import { storageService } from './services/storageService';
 
 const DB_VERSION = "1.1.0"; 
 
+const LogoIcon = ({ className = "w-16 h-16" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M256 32L64 96V224C64 341.2 145.6 449.2 256 480C366.4 449.2 448 341.2 448 224V96L256 32Z" fill="#FF8C00"/>
+    <path d="M256 120L180 320H215L230 280H282L297 320H332L256 120ZM240 250L256 205L272 250H240Z" fill="white"/>
+    <circle cx="360" cy="180" r="8" fill="white"/>
+    <path d="M360 188V240M360 240L380 260M360 240L340 260" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    <circle cx="360" cy="300" r="8" fill="white"/>
+    <path d="M360 292V270" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    <circle cx="150" cy="280" r="6" fill="white"/>
+    <path d="M150 274V220" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+  </svg>
+);
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeView, setActiveView] = useState<string>('home');
@@ -179,6 +192,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white flex-col gap-6 font-['Noto_Sans_KR']">
         <div className="text-center space-y-4">
+          <LogoIcon className="w-12 h-12 mx-auto mb-4" />
           <h2 className="text-gray-400 font-black text-sm tracking-[0.3em] uppercase">Oikos University AI Convergence LMS</h2>
           <p className="text-gray-300 text-[10px] font-bold tracking-[0.4em] uppercase">Persistent Storage V{DB_VERSION}</p>
         </div>
@@ -197,6 +211,7 @@ const App: React.FC = () => {
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 border border-gray-100 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-[#00479d]"></div>
           <div className="text-center mb-10">
+            <LogoIcon className="w-20 h-20 mx-auto mb-6" />
             <h1 className="text-4xl font-black text-[#00479d] tracking-tighter">OIKOS AI LMS</h1>
             <p className="text-gray-400 mt-3 font-bold uppercase text-[10px] tracking-[0.2em]">Learning Management System</p>
           </div>
@@ -382,8 +397,8 @@ const App: React.FC = () => {
       <footer className="bg-white border-t border-gray-100 pt-16 pb-12 mt-20">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <div className="mb-8 flex flex-col items-center">
-             <a href="https://www.oikos.ac.kr/" target="_blank" rel="noreferrer" className="flex items-center gap-3 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all">
-                <img src="https://www.oikos.ac.kr/images/common/logo.png" alt="Oikos Logo" className="h-10" />
+             <a href="https://www.oikos.ai.kr/" target="_blank" rel="noreferrer" className="flex items-center gap-3 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all">
+                <LogoIcon className="h-12 w-12" />
                 <span className="text-sm font-black text-gray-700">OIKOS UNIVERSITY</span>
              </a>
           </div>
@@ -394,12 +409,6 @@ const App: React.FC = () => {
           </div>
           
           <p className="text-gray-300 text-[10px] mt-6 font-bold tracking-[0.3em] uppercase">Persistent Storage V{DB_VERSION}</p>
-          
-          <div className="mt-10 flex justify-center gap-6">
-             <span className="w-1.5 h-1.5 bg-blue-100 rounded-full"></span>
-             <span className="w-1.5 h-1.5 bg-blue-100 rounded-full"></span>
-             <span className="w-1.5 h-1.5 bg-blue-100 rounded-full"></span>
-          </div>
           
           <p className="mt-8 text-[10px] text-gray-300 font-medium">&copy; 2026 Oikos University. All Rights Reserved.</p>
         </div>
