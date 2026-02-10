@@ -17,13 +17,17 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
   const [activeTab, setActiveTab] = useState<'info' | 'materials' | 'attendance'>('info');
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   
-  // Resource Form State
+  // Simplified Resource Form State
   const [isUploading, setIsUploading] = useState(false);
   const [newResTitle, setNewResTitle] = useState('');
   const [newResLink, setNewResLink] = useState('');
   const [newResType, setNewResType] = useState<'file' | 'link'>('file');
 
-  // 실시간 통합 명단에서 이 과목을 신청한 학생 필터링
+  // Filter resources that belong ONLY to this specific course
+  const courseResources = useMemo(() => {
+    return resources.filter(res => res.courseId === course.id);
+  }, [resources, course.id]);
+
   const enrolledStudents = useMemo(() => {
     return students
       .filter(s => s.registeredCourseIds?.includes(course.id))
@@ -40,14 +44,18 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
 
   const handleSubmitResource = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newResTitle) return;
+    if (!newResTitle || !newResLink) {
+      alert("제목과 링크 주소를 모두 입력해주세요.");
+      return;
+    }
 
     const newRes: Resource = {
       id: 'res-' + Date.now(),
+      courseId: course.id,
       title: newResTitle,
-      link: newResLink || '#',
+      link: newResLink,
       type: newResType,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
     };
 
     onAddResource(newRes);
@@ -103,9 +111,9 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
                   className={`py-4 px-1 border-b-2 text-sm font-black whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === tab.id ? 'border-[#00479d] text-[#00479d]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                 >
                   {tab.label}
-                  {tab.count !== undefined && (
+                  {tab.id === 'materials' && courseResources.length > 0 && (
                     <span className={`text-[10px] px-2 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-blue-100 text-[#00479d]' : 'bg-gray-200 text-gray-500'}`}>
-                      {tab.count}
+                      {courseResources.length}
                     </span>
                   )}
                 </button>
@@ -153,42 +161,50 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
                   {!isUploading ? (
                     <button 
                       onClick={() => setIsUploading(true)}
-                      className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-bold hover:border-[#00479d] hover:text-[#00479d] transition-all flex items-center justify-center gap-2"
+                      className="w-full py-4 border-2 border-dashed border-gray-100 rounded-2xl text-gray-400 font-bold hover:border-[#00479d] hover:text-[#00479d] transition-all flex items-center justify-center gap-2 group"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                      새로운 강의 자료 올리기
+                      <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      새로운 강의 자료 링크 등록
                     </button>
                   ) : (
-                    <form onSubmit={handleSubmitResource} className="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4 animate-fadeIn">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input 
-                          type="text" 
-                          placeholder="자료 제목 (예: 1주차 강의안)"
-                          className="px-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-500"
-                          value={newResTitle}
-                          onChange={(e) => setNewResTitle(e.target.value)}
-                          required
-                        />
-                        <input 
-                          type="text" 
-                          placeholder="링크 URL (선택사항)"
-                          className="px-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-500"
-                          value={newResLink}
-                          onChange={(e) => setNewResLink(e.target.value)}
-                        />
+                    <form onSubmit={handleSubmitResource} className="bg-blue-50/30 p-8 rounded-3xl border border-blue-100 space-y-5 animate-fadeIn">
+                      <h4 className="font-black text-[#00479d] text-sm uppercase tracking-wider">강의 자료 등록</h4>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-blue-400 ml-1 uppercase">자료 제목</label>
+                          <input 
+                            type="text" 
+                            placeholder="예: 1주차 강의 교안 (PDF)"
+                            className="w-full px-5 py-3 rounded-xl border-none outline-none focus:ring-2 focus:ring-[#00479d] bg-white shadow-sm font-medium"
+                            value={newResTitle}
+                            onChange={(e) => setNewResTitle(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-blue-400 ml-1 uppercase">링크 주소 (URL)</label>
+                          <input 
+                            type="url" 
+                            placeholder="https://drive.google.com/..."
+                            className="w-full px-5 py-3 rounded-xl border-none outline-none focus:ring-2 focus:ring-[#00479d] bg-white shadow-sm font-medium"
+                            value={newResLink}
+                            onChange={(e) => setNewResLink(e.target.value)}
+                            required
+                          />
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div className="flex gap-4">
-                          <label className="flex items-center text-sm font-bold text-gray-600">
-                            <input type="radio" className="mr-2" checked={newResType === 'file'} onChange={() => setNewResType('file')} /> 파일
+                      <div className="flex justify-between items-center pt-2">
+                        <div className="flex gap-6">
+                          <label className="flex items-center text-xs font-black text-gray-500 cursor-pointer">
+                            <input type="radio" className="mr-2 w-4 h-4 text-[#00479d]" checked={newResType === 'file'} onChange={() => setNewResType('file')} /> 문서/파일
                           </label>
-                          <label className="flex items-center text-sm font-bold text-gray-600">
-                            <input type="radio" className="mr-2" checked={newResType === 'link'} onChange={() => setNewResType('link')} /> 링크
+                          <label className="flex items-center text-xs font-black text-gray-500 cursor-pointer">
+                            <input type="radio" className="mr-2 w-4 h-4 text-[#00479d]" checked={newResType === 'link'} onChange={() => setNewResType('link')} /> 외부링크
                           </label>
                         </div>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => setIsUploading(false)} className="px-4 py-2 text-sm font-bold text-gray-400">취소</button>
-                          <button type="submit" className="px-6 py-2 bg-[#00479d] text-white rounded-lg text-sm font-bold shadow-md">자료 등록</button>
+                          <button type="button" onClick={() => setIsUploading(false)} className="px-5 py-2.5 text-xs font-black text-gray-400 hover:text-gray-600">취소</button>
+                          <button type="submit" className="px-7 py-2.5 bg-[#00479d] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-100 hover:-translate-y-0.5 transition-transform">자료 저장</button>
                         </div>
                       </div>
                     </form>
@@ -197,11 +213,11 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
               )}
 
               <div className="space-y-4">
-                {resources.length > 0 ? (
-                  resources.map(resource => (
-                    <div key={resource.id} className="flex items-center justify-between p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                {courseResources.length > 0 ? (
+                  courseResources.map(resource => (
+                    <div key={resource.id} className="flex items-center justify-between p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
                       <div className="flex items-center">
-                        <div className={`p-4 rounded-2xl mr-5 ${resource.type === 'file' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                        <div className={`p-4 rounded-2xl mr-5 transition-colors ${resource.type === 'file' ? 'bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white' : 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white'}`}>
                           {resource.type === 'file' ? (
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                           ) : (
@@ -209,22 +225,27 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
                           )}
                         </div>
                         <div>
-                          <p className="font-black text-gray-900 text-lg">{resource.title}</p>
-                          <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-wider">Uploaded at {resource.date}</p>
+                          <p className="font-black text-gray-900 text-lg group-hover:text-[#00479d] transition-colors">{resource.title}</p>
+                          <p className="text-[10px] text-gray-400 font-black mt-1 uppercase tracking-widest">Added on {resource.date}</p>
                         </div>
                       </div>
                       <a 
                         href={resource.link} 
                         target="_blank" 
                         rel="noreferrer"
-                        className="bg-white border border-gray-200 text-gray-500 hover:bg-[#00479d] hover:text-white px-6 py-2.5 rounded-xl text-xs font-black transition-all shadow-sm"
+                        className="bg-gray-50 text-gray-400 group-hover:bg-[#00479d] group-hover:text-white px-7 py-3 rounded-2xl text-xs font-black transition-all shadow-sm border border-gray-100 group-hover:border-[#00479d]"
                       >
-                        DOWNLOAD
+                        {resource.type === 'file' ? 'DOWNLOAD' : 'OPEN LINK'}
                       </a>
                     </div>
                   ))
                 ) : (
-                  <div className="py-24 text-center text-gray-300 border-2 border-dashed border-gray-100 rounded-3xl">등록된 강의 자료가 없습니다.</div>
+                  <div className="py-20 text-center bg-gray-50/50 border-2 border-dashed border-gray-100 rounded-3xl flex flex-col items-center gap-4">
+                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-gray-200 shadow-sm">
+                       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                     </div>
+                     <p className="font-bold text-gray-400">등록된 강의 자료가 없습니다.</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -247,7 +268,7 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
-                    {enrolledStudents.map((student, idx) => (
+                    {enrolledStudents.length > 0 ? enrolledStudents.map((student, idx) => (
                       <tr key={idx} className="hover:bg-blue-50/20 transition-colors group">
                         <td className="px-8 py-6 whitespace-nowrap">
                           <div className="flex items-center">
@@ -271,7 +292,13 @@ export const CourseDetail: React.FC<CourseDetailProps> = ({
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr>
+                        <td colSpan={3} className="px-8 py-20 text-center text-gray-300 font-bold italic">
+                          수강 신청한 학생이 없습니다.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

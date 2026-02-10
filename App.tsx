@@ -8,7 +8,7 @@ import { CourseDetail } from './components/CourseDetail';
 import { CourseRegistration } from './components/CourseRegistration';
 import { storageService } from './services/storageService';
 
-const DB_VERSION = "1.1.0 (Local Persistence)"; 
+const DB_VERSION = "1.1.0"; 
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,12 +27,11 @@ const App: React.FC = () => {
   const [role, setRole] = useState<Role>(Role.STUDENT);
   const [rememberEmail, setRememberEmail] = useState(false);
 
-  // Load Database synchronously from Storage Service (LocalStorage)
+  // Load Database
   useEffect(() => {
     const initData = () => {
       setIsLoading(true);
       try {
-        // 우선 로컬 저장소에서 데이터를 확인합니다.
         const students = storageService.load<any[]>('global_students', []);
         const resources = storageService.load<Resource[]>('global_resources', RESOURCES);
         
@@ -52,14 +51,14 @@ const App: React.FC = () => {
       } catch (err) {
         console.error("Initialization error:", err);
       } finally {
-        setIsLoading(false);
+        setTimeout(() => setIsLoading(false), 800);
       }
     };
 
     initData();
   }, []);
 
-  // Sync Global Data with LocalStorage whenever state changes
+  // Sync Global Data
   useEffect(() => {
     if (isLoading) return;
     storageService.save('global_students', globalStudents);
@@ -98,7 +97,6 @@ const App: React.FC = () => {
       finalRegisteredIds = COURSES.map(c => c.id);
     }
     else {
-      // 로컬 명단에서 먼저 찾아봅니다.
       const existingStudent = globalStudents.find(s => s.email.toLowerCase() === normalizedEmail);
       if (existingStudent) {
         finalName = existingStudent.name;
@@ -179,9 +177,16 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 flex-col gap-4">
-        <div className="w-12 h-12 border-4 border-blue-100 border-t-[#00479d] rounded-full animate-spin"></div>
-        <p className="text-[#00479d] font-black text-sm animate-pulse">LOADING DATABASE...</p>
+      <div className="min-h-screen flex items-center justify-center bg-white flex-col gap-6 font-['Noto_Sans_KR']">
+        <div className="text-center space-y-4">
+          <h2 className="text-gray-400 font-black text-sm tracking-[0.3em] uppercase">Oikos University AI Convergence LMS</h2>
+          <p className="text-gray-300 text-[10px] font-bold tracking-[0.4em] uppercase">Persistent Storage V{DB_VERSION}</p>
+        </div>
+        <div className="flex gap-2">
+           <div className="w-2 h-2 bg-blue-100 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+           <div className="w-2 h-2 bg-blue-100 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+           <div className="w-2 h-2 bg-blue-100 rounded-full animate-bounce"></div>
+        </div>
       </div>
     );
   }
@@ -374,18 +379,29 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="bg-white border-t border-gray-100 py-16 mt-20">
+      <footer className="bg-white border-t border-gray-100 pt-16 pb-12 mt-20">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <div className="mb-6 opacity-30 flex justify-center gap-4 grayscale">
-             <img src="https://www.oikos.ac.kr/images/common/logo.png" alt="Oikos Logo" className="h-8" />
+          <div className="mb-8 flex flex-col items-center">
+             <a href="https://www.oikos.ac.kr/" target="_blank" rel="noreferrer" className="flex items-center gap-3 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all">
+                <img src="https://www.oikos.ac.kr/images/common/logo.png" alt="Oikos Logo" className="h-10" />
+                <span className="text-sm font-black text-gray-700">OIKOS UNIVERSITY</span>
+             </a>
           </div>
-          <p className="text-gray-400 text-sm font-black tracking-widest uppercase">OIKOS University AI Convergence LMS</p>
-          <p className="text-gray-300 text-[10px] mt-4 font-bold tracking-[0.3em] uppercase">Persistent Storage V{DB_VERSION}</p>
-          <div className="mt-8 flex justify-center gap-6">
-             <span className="w-2 h-2 bg-blue-100 rounded-full"></span>
-             <span className="w-2 h-2 bg-blue-100 rounded-full"></span>
-             <span className="w-2 h-2 bg-blue-100 rounded-full"></span>
+          
+          <div className="space-y-2">
+            <p className="text-[#00479d] text-sm font-black tracking-widest uppercase">AI Convergence Learning Management System</p>
+            <p className="text-gray-400 text-xs font-bold">문의 - 최영준 교수 010 8534 0387</p>
           </div>
+          
+          <p className="text-gray-300 text-[10px] mt-6 font-bold tracking-[0.3em] uppercase">Persistent Storage V{DB_VERSION}</p>
+          
+          <div className="mt-10 flex justify-center gap-6">
+             <span className="w-1.5 h-1.5 bg-blue-100 rounded-full"></span>
+             <span className="w-1.5 h-1.5 bg-blue-100 rounded-full"></span>
+             <span className="w-1.5 h-1.5 bg-blue-100 rounded-full"></span>
+          </div>
+          
+          <p className="mt-8 text-[10px] text-gray-300 font-medium">&copy; 2026 Oikos University. All Rights Reserved.</p>
         </div>
       </footer>
     </div>

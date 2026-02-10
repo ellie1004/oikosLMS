@@ -91,7 +91,5 @@ export const ANNOUNCEMENTS: Announcement[] = [
   }
 ];
 
-export const RESOURCES: Resource[] = [
-  { id: "r1", title: "생성형 AI 기초 가이드 PDF", date: "2026-03-09", link: "#", type: "file" },
-  { id: "r2", title: "AI 미디어 창작 툴셋 링크", date: "2026-03-26", link: "https://example.com", type: "link" }
-];
+// Resources are now empty by default, allowing users to build their own library.
+export const RESOURCES: Resource[] = [];

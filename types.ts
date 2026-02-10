@@ -32,6 +32,7 @@ export interface Announcement {
 
 export interface Resource {
   id: string;
+  courseId: string; // Added to distinguish resources by course
   title: string;
   date: string;
   link: string;
