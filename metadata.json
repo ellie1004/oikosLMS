@@ -1,0 +1,8 @@
+{
+  "name": "Oikos AI Convergence LMS 2026",
+  "description": "A comprehensive Learning Management System for the AI Convergence Department, featuring role-based dashboards, course management, attendance tracking, and resource sharing for the Spring 2026 semester.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
