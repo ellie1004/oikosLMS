@@ -1,6 +1,6 @@
 
 import { db } from "../firebaseConfig";
-import { collection, getDocs, setDoc, doc } from "firebase/firestore";
+import { collection, getDocs, setDoc, doc, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 
 export const cloudService = {
   // 학생 명단 전체 가져오기
@@ -8,7 +8,7 @@ export const cloudService = {
     try {
       const querySnapshot = await getDocs(collection(db, "students"));
       const students: any[] = [];
-      querySnapshot.forEach((doc) => {
+      querySnapshot.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         students.push(doc.data());
       });
       return students;
