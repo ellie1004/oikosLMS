@@ -1,6 +1,6 @@
 
 import { db } from "../firebaseConfig";
-import { collection, getDocs, setDoc, doc, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { collection, getDocs, setDoc, doc, getDoc, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 
 export const cloudService = {
   // 학생 명단 전체 가져오기
@@ -13,11 +13,7 @@ export const cloudService = {
       });
       return students;
     } catch (e: any) {
-      if (e.code === 'permission-denied') {
-        console.error("Firebase 권한 에러: Firestore의 '규칙(Rules)' 탭에서 read, write를 true로 설정했는지 확인하세요.");
-      } else {
-        console.error("Firebase fetch error:", e);
-      }
+      console.error("Firebase fetch error:", e);
       return null;
     }
   },
@@ -26,7 +22,6 @@ export const cloudService = {
   syncStudent: async (student: { email: string; name: string; registeredCourseIds: string[] }) => {
     try {
       if (!student.email) return false;
-      
       const email = student.email.trim().toLowerCase();
       await setDoc(doc(db, "students", email), {
         email: email,
@@ -34,11 +29,36 @@ export const cloudService = {
         registeredCourseIds: student.registeredCourseIds || [],
         lastUpdated: new Date().toISOString()
       }, { merge: true });
-      
-      console.log("✅ Firebase 동기화 성공:", student.name);
       return true;
     } catch (e: any) {
-      console.error("❌ Firebase 동기화 실패:", e.message);
+      console.error("❌ Firebase sync error:", e.message);
+      return false;
+    }
+  },
+
+  // 특정 강의의 모든 출석 데이터 가져오기
+  fetchAttendance: async (courseId: string) => {
+    try {
+      const docRef = doc(db, "attendance", courseId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data();
+      }
+      return {};
+    } catch (e) {
+      console.error("Attendance fetch error:", e);
+      return {};
+    }
+  },
+
+  // 특정 강의의 출석 데이터 업데이트
+  saveAttendance: async (courseId: string, attendanceData: any) => {
+    try {
+      await setDoc(doc(db, "attendance", courseId), attendanceData, { merge: true });
+      console.log("✅ 출석 데이터 서버 저장 완료");
+      return true;
+    } catch (e) {
+      console.error("Attendance save error:", e);
       return false;
     }
   }
