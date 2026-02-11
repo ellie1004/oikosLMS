@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Role, Resource } from './types';
 import { COURSES, ANNOUNCEMENTS, AUTHORIZED_PROFESSORS, AUTHORIZED_ADMINS, RESOURCES } from './constants';
 import { Navbar } from './components/Navigation';
@@ -7,8 +7,9 @@ import { Dashboard } from './components/Dashboard';
 import { CourseDetail } from './components/CourseDetail';
 import { CourseRegistration } from './components/CourseRegistration';
 import { storageService } from './services/storageService';
+import { cloudService } from './services/cloudService';
 
-const DB_VERSION = "1.1.0"; 
+const DB_VERSION = "2.0.0 (Powered by Firebase)"; 
 
 const LogoIcon = ({ className = "w-16 h-16" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -29,6 +30,7 @@ const App: React.FC = () => {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Database States
   const [globalStudents, setGlobalStudents] = useState<any[]>([]);
@@ -40,27 +42,51 @@ const App: React.FC = () => {
   const [role, setRole] = useState<Role>(Role.STUDENT);
   const [rememberEmail, setRememberEmail] = useState(false);
 
-  // Load Database
+  // Cloud Sync Data Fetching
+  const refreshCloudData = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const students = await cloudService.fetchStudents();
+      if (students) {
+        setGlobalStudents(students);
+        // Update local session if current user exists in cloud
+        const savedUserStr = localStorage.getItem('OIKOS_LMS_V1.1_current_user');
+        if (savedUserStr) {
+          const currentUser = JSON.parse(savedUserStr);
+          const me = students.find((s: any) => s.email.toLowerCase() === currentUser.email.toLowerCase());
+          if (me) {
+            const updatedUser = { ...currentUser, name: me.name || currentUser.name, registeredCourseIds: me.registeredCourseIds };
+            setUser(updatedUser);
+            localStorage.setItem('OIKOS_LMS_V1.1_current_user', JSON.stringify(updatedUser));
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Cloud Refresh Failed", e);
+    } finally {
+      setTimeout(() => setIsSyncing(false), 500);
+    }
+  }, []);
+
+  // Initial Load
   useEffect(() => {
-    const initData = () => {
+    const initData = async () => {
       setIsLoading(true);
       try {
-        const students = storageService.load<any[]>('global_students', []);
+        const localStudents = storageService.load<any[]>('global_students', []);
         const resources = storageService.load<Resource[]>('global_resources', RESOURCES);
-        
         const savedEmail = localStorage.getItem('OIKOS_LMS_REMEMBERED_EMAIL');
         const savedUserStr = localStorage.getItem('OIKOS_LMS_V1.1_current_user');
 
-        setGlobalStudents(students);
         setGlobalResources(resources);
+        if (savedEmail) { setEmail(savedEmail); setRememberEmail(true); }
+        if (savedUserStr) { setUser(JSON.parse(savedUserStr)); }
         
-        if (savedEmail) {
-          setEmail(savedEmail);
-          setRememberEmail(true);
-        }
-        if (savedUserStr) {
-          setUser(JSON.parse(savedUserStr));
-        }
+        // Fetch from Firebase
+        const cloudStudents = await cloudService.fetchStudents();
+        if (cloudStudents) setGlobalStudents(cloudStudents);
+        else setGlobalStudents(localStudents);
+
       } catch (err) {
         console.error("Initialization error:", err);
       } finally {
@@ -71,29 +97,17 @@ const App: React.FC = () => {
     initData();
   }, []);
 
-  // Sync Global Data
+  // Sync to LocalStorage as fallback
   useEffect(() => {
     if (isLoading) return;
     storageService.save('global_students', globalStudents);
-  }, [globalStudents, isLoading]);
-
-  useEffect(() => {
-    if (isLoading) return;
     storageService.save('global_resources', globalResources);
-  }, [globalResources, isLoading]);
+  }, [globalStudents, globalResources, isLoading]);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('OIKOS_LMS_V1.1_current_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('OIKOS_LMS_V1.1_current_user');
-    }
-  }, [user]);
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    let finalName = name;
+    let finalName = name.trim();
     let finalRegisteredIds: string[] = [];
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -110,12 +124,13 @@ const App: React.FC = () => {
       finalRegisteredIds = COURSES.map(c => c.id);
     }
     else {
+      // Student login: check cloud first
       const existingStudent = globalStudents.find(s => s.email.toLowerCase() === normalizedEmail);
       if (existingStudent) {
-        finalName = existingStudent.name;
+        finalName = existingStudent.name || name.trim();
         finalRegisteredIds = existingStudent.registeredCourseIds || [];
       }
-      if (!finalName && !name) { setError('성함을 입력해주세요.'); return; }
+      if (!finalName) { setError('성함을 입력해주세요.'); return; }
     }
 
     const newUser: User = { email: normalizedEmail, name: finalName, role, registeredCourseIds: finalRegisteredIds };
@@ -124,25 +139,33 @@ const App: React.FC = () => {
     else localStorage.removeItem('OIKOS_LMS_REMEMBERED_EMAIL');
 
     setUser(newUser);
+    localStorage.setItem('OIKOS_LMS_V1.1_current_user', JSON.stringify(newUser));
 
     if (role === Role.STUDENT) {
+      const studentData = { name: finalName, email: normalizedEmail, registeredCourseIds: finalRegisteredIds };
       setGlobalStudents(prev => {
-        if (!prev.find(s => s.email.toLowerCase() === normalizedEmail)) {
-          return [...prev, { name: finalName, email: normalizedEmail, registeredCourseIds: finalRegisteredIds }];
-        }
-        return prev;
+        const idx = prev.findIndex(s => s.email.toLowerCase() === normalizedEmail);
+        if (idx === -1) return [...prev, studentData];
+        const updated = [...prev];
+        updated[idx] = studentData;
+        return updated;
       });
+      
+      setIsSyncing(true);
+      await cloudService.syncStudent(studentData);
+      setIsSyncing(false);
     }
     setActiveView('home');
   };
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('OIKOS_LMS_V1.1_current_user');
     setActiveView('home');
     setSelectedCourseId(null);
   };
 
-  const handleRegisterCourse = (courseId: string) => {
+  const handleRegisterCourse = async (courseId: string) => {
     if (!user) return;
     const currentRegistered = user.registeredCourseIds || [];
     if (currentRegistered.includes(courseId)) return;
@@ -150,42 +173,45 @@ const App: React.FC = () => {
     const updatedIds = [...currentRegistered, courseId];
     const updatedUser = { ...user, registeredCourseIds: updatedIds };
     setUser(updatedUser);
+    localStorage.setItem('OIKOS_LMS_V1.1_current_user', JSON.stringify(updatedUser));
 
+    const studentInfo = { name: user.name, email: user.email, registeredCourseIds: updatedIds };
+    
     setGlobalStudents(prev => {
-      const email = user.email.toLowerCase();
-      const existingIdx = prev.findIndex(s => s.email.toLowerCase() === email);
+      const existingIdx = prev.findIndex(s => s.email.toLowerCase() === user.email.toLowerCase());
       if (existingIdx > -1) {
         const newStudents = [...prev];
-        newStudents[existingIdx] = { ...newStudents[existingIdx], registeredCourseIds: updatedIds };
+        newStudents[existingIdx] = studentInfo;
         return newStudents;
       }
-      return [...prev, { name: user.name, email: user.email, registeredCourseIds: updatedIds }];
+      return [...prev, studentInfo];
     });
+
+    setIsSyncing(true);
+    await cloudService.syncStudent(studentInfo);
+    setIsSyncing(false);
   };
 
-  const handleUnregisterCourse = (courseId: string) => {
+  const handleUnregisterCourse = async (courseId: string) => {
     if (!user) return;
     const updatedIds = (user.registeredCourseIds || []).filter(id => id !== courseId);
     const updatedUser = { ...user, registeredCourseIds: updatedIds };
     setUser(updatedUser);
+    localStorage.setItem('OIKOS_LMS_V1.1_current_user', JSON.stringify(updatedUser));
 
+    const studentInfo = { name: user.name, email: user.email, registeredCourseIds: updatedIds };
+    
     setGlobalStudents(prev => prev.map(s => 
-      s.email.toLowerCase() === user.email.toLowerCase() ? { ...s, registeredCourseIds: updatedIds } : s
+      s.email.toLowerCase() === user.email.toLowerCase() ? studentInfo : s
     ));
+
+    setIsSyncing(true);
+    await cloudService.syncStudent(studentInfo);
+    setIsSyncing(false);
   };
 
   const handleAddResource = (newResource: Resource) => {
     setGlobalResources(prev => [newResource, ...prev]);
-  };
-
-  const exportDB = () => {
-    const dbData = storageService.exportAll();
-    const blob = new Blob([JSON.stringify(dbData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `OIKOS_LMS_BACKUP.json`;
-    a.click();
   };
 
   if (isLoading) {
@@ -194,12 +220,12 @@ const App: React.FC = () => {
         <div className="text-center space-y-4">
           <LogoIcon className="w-12 h-12 mx-auto mb-4" />
           <h2 className="text-gray-400 font-black text-sm tracking-[0.3em] uppercase">Oikos University AI Convergence LMS</h2>
-          <p className="text-gray-300 text-[10px] font-bold tracking-[0.4em] uppercase">Persistent Storage V{DB_VERSION}</p>
+          <p className="text-gray-300 text-[10px] font-bold tracking-[0.4em] uppercase">Cloud Engine Loading...</p>
         </div>
         <div className="flex gap-2">
-           <div className="w-2 h-2 bg-blue-100 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-           <div className="w-2 h-2 bg-blue-100 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-           <div className="w-2 h-2 bg-blue-100 rounded-full animate-bounce"></div>
+           <div className="w-2 h-2 bg-[#00479d] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+           <div className="w-2 h-2 bg-[#00479d] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+           <div className="w-2 h-2 bg-[#00479d] rounded-full animate-bounce"></div>
         </div>
       </div>
     );
@@ -212,8 +238,8 @@ const App: React.FC = () => {
           <div className="absolute top-0 left-0 w-full h-1.5 bg-[#00479d]"></div>
           <div className="text-center mb-10">
             <LogoIcon className="w-20 h-20 mx-auto mb-6" />
-            <h1 className="text-4xl font-black text-[#00479d] tracking-tighter">OIKOS AI LMS</h1>
-            <p className="text-gray-400 mt-3 font-bold uppercase text-[10px] tracking-[0.2em]">Learning Management System</p>
+            <h1 className="text-4xl font-black text-[#00479d] tracking-tighter text-center">OIKOS AI LMS</h1>
+            <p className="text-gray-400 mt-3 font-bold uppercase text-[10px] tracking-[0.2em] text-center">Cloud Synchronized System</p>
           </div>
           
           <form onSubmit={handleLogin} className="space-y-6">
@@ -263,25 +289,39 @@ const App: React.FC = () => {
       <Navbar user={user} onLogout={handleLogout} activeView={activeView} setActiveView={setActiveView} />
       
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-end mb-4 h-4">
-           <span className="text-[9px] font-black text-emerald-400 flex items-center gap-1">
-             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-             PERSISTENCE ACTIVE (V{DB_VERSION})
+        <div className="flex justify-between items-center mb-4 h-6">
+           <div className="flex gap-4">
+             {isSyncing ? (
+               <span className="text-[10px] font-black text-orange-500 animate-pulse flex items-center gap-2">
+                 <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                 FIREBASE CLOUD SYNCING...
+               </span>
+             ) : (
+               <button onClick={refreshCloudData} className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1">
+                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                 FIREBASE CONNECTED
+               </button>
+             )}
+           </div>
+           <span className="text-[9px] font-black text-gray-400 flex items-center gap-1">
+             OIKOS UNIVERSITY ENGINE V{DB_VERSION}
            </span>
         </div>
 
         {activeView === 'home' && (
           <div className="space-y-8">
             <Dashboard user={user} setActiveView={setActiveView} setSelectedCourseId={setSelectedCourseId} />
-            {user.role === Role.ADMIN && (
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-orange-100 flex flex-col md:flex-row justify-between items-center gap-6">
-                <div className="text-center md:text-left">
-                  <h3 className="text-xl font-black text-orange-800">DATABASE CENTER</h3>
-                  <p className="text-sm text-orange-600/70 font-bold mt-1">시스템에 등록된 실제 학생 데이터: {globalStudents.length}명</p>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={exportDB} className="px-8 py-3 bg-orange-500 text-white rounded-2xl font-black shadow-lg shadow-orange-100 hover:scale-105 transition-transform">백업 파일 생성</button>
-                  <button onClick={() => { if(window.confirm("초기화하시겠습니까?")) { storageService.clear(); window.location.reload(); } }} className="px-8 py-3 bg-white border-2 border-orange-100 text-orange-300 rounded-2xl font-black hover:bg-orange-50 transition-colors">시스템 리셋</button>
+            
+            {(user.role === Role.ADMIN || user.role === Role.PROFESSOR) && (
+              <div className="bg-white p-8 rounded-3xl shadow-sm border border-blue-100 space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-b border-blue-50 pb-6">
+                  <div className="text-center md:text-left">
+                    <h3 className="text-xl font-black text-blue-800 uppercase">Cloud Students Directory</h3>
+                    <p className="text-sm text-blue-600/70 font-bold mt-1">Firestore 기반 수강생: <span className="text-blue-900">{globalStudents.length}명</span></p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={refreshCloudData} className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-100 hover:scale-105 transition-transform">명단 동기화</button>
+                  </div>
                 </div>
               </div>
             )}
@@ -324,9 +364,15 @@ const App: React.FC = () => {
 
         {activeView === 'attendance' && (user.role === Role.PROFESSOR || user.role === Role.ADMIN) && (
           <div className="space-y-8 animate-fadeIn">
-            <div className="flex items-center gap-4">
-               <div className="w-2 h-8 bg-[#00479d] rounded-full"></div>
-               <h1 className="text-3xl font-black text-gray-900 tracking-tighter">실시간 수강 및 출석 현황</h1>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                 <div className="w-2 h-8 bg-[#00479d] rounded-full"></div>
+                 <h1 className="text-3xl font-black text-gray-900 tracking-tighter">실시간 수강 및 출석 현황</h1>
+              </div>
+              <button onClick={refreshCloudData} className="px-4 py-2 bg-blue-50 text-[#00479d] rounded-xl text-xs font-black hover:bg-blue-100 transition-all flex items-center gap-2">
+                <svg className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                서버 데이터 동기화
+              </button>
             </div>
             <div className="grid grid-cols-1 gap-6">
               {COURSES.map(course => {
@@ -407,9 +453,6 @@ const App: React.FC = () => {
             <p className="text-[#00479d] text-sm font-black tracking-widest uppercase">AI Convergence Learning Management System</p>
             <p className="text-gray-400 text-xs font-bold">문의 - 최영준 교수 010 8534 0387</p>
           </div>
-          
-          <p className="text-gray-300 text-[10px] mt-6 font-bold tracking-[0.3em] uppercase">Persistent Storage V{DB_VERSION}</p>
-          
           <p className="mt-8 text-[10px] text-gray-300 font-medium">&copy; 2026 Oikos University. All Rights Reserved.</p>
         </div>
       </footer>
