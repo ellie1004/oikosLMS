@@ -45,7 +45,7 @@ export const COURSES: Course[] = [
     titleEn: "AI-Assisted Creative Writing",
     instructor: "김세광 교수",
     description: "AI를 활용하여 글을 작성하고 출판까지의 모든 크리에이터 컨텐츠를 연구한다.",
-    dates: ["3월 31일", "4월 2일", "4월 9일"]
+    dates: ["3월 31일", "4월 14일", "4월 28일"]
   },
   {
     id: "business-ai",
@@ -69,7 +69,7 @@ export const COURSES: Course[] = [
 export const DEFENSE_SCHEDULES: DefenseSchedule[] = [
   { date: "3월 3일(화)", time: "저녁 8시", students: ["배혜숙", "오경근", "김재성"] },
   { date: "3월 5일(목)", time: "저녁 8시", students: ["신이재", "성정민", "김신애"] },
-  { date: "3월 9일(월)", time: "저녁 8시", students: ["이경숙", "김은하", "이경림", "조재윤"] }
+  { date: "3월 10일(화)", time: "저녁 8시", students: ["이경숙", "김은하", "이경림", "조재윤"] }
 ];
 
 export const MOCK_STUDENT_REGISTRY: any[] = [];
@@ -91,5 +91,4 @@ export const ANNOUNCEMENTS: Announcement[] = [
   }
 ];
 
-// Resources are now empty by default, allowing users to build their own library.
 export const RESOURCES: Resource[] = [];
